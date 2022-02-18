@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html>
+<head>
+		
+<meta name="generator" content="HTML Tidy for HTML5 (experimental) for Linux https://github.com/w3c/tidy-html5/tree/c63cc39">
+
+<meta charset="UTF-8">
+
+
+<!--favicon-->
+<link rel="apple-touch-icon" sizes="76x76" href="/expt/apple-touch-icon.png">
+<link rel="icon" type="image/png" href="/expt/favicon-32x32.png" sizes="32x32">
+<link rel="icon" type="image/png" href="/expt/favicon-16x16.png" sizes="16x16">
+<link rel="manifest" href="/expt/manifest.json">
+<link rel="mask-icon" href="/expt/safari-pinned-tab.svg" color="#5bbad5">
+<meta name="theme-color" content="#ffffff">
+
+
+<script src="jquery-3.2.0.min.js"></script>
+<script src="jquery.csv-0.8.1.min.js"></script>
+
+<script>
+    var verification = "6ERGHNSD56GJS5";
+    var filename = "stoc_dom_2";
+	var subNo;
+	var trials;
+	var conditions = new Array();
+	var condition;
+	var responses;
+	var toggleCount = 0;
+	var noRequiredToggles = 5;
+	var currentTrial = 0;
+	var maxLocalSub = 4; // Maximum subject number if server is not available
+	var workerId;
+	var trials = new Array();
+	var interTrialInterval=500;
+	var toggleDelay=5000;
+    var startTime;
+	var stopTime;
+    var experimentStartTime;
+	var experimentStopTime;
+	var rawTrials= new Array();
+
+	function Shuffle(o) {
+		for(var j, x, i = o.length; i; j = parseInt(Math.random() * i), x = o[--i], o[i] = o[j], o[j] = x);
+		return o;
+	}
+	
+	$(document).ready(function(){
+		workerId = GetParam("workerId", "NONE");
+		if(workerId == "regexFail"){
+			//Preview mode
+			$("#preview").show();
+		} else {
+			// Begin experiment
+			verification = Math.random().toString(36).slice(2);
+			GetSubNo();
+		}
+	});
+
+	function GetParam(name, defaultValue) { 
+		var regex = new RegExp( "[\?&]"+name+"=([^&#]*)" ); 
+		var results = regex.exec(window.location.href);
+		if(results == null) { 
+			return defaultValue; 
+		} else { 
+			return results[1];    
+		}
+	}
+
+	function ResetTrial() {
+		$("#choicepage").hide();
+		toggleCount=0;
+		if(trials[condition][currentTrial].toggle==0) {
+			$("#toggle").hide();
+			$("#toggleinstruction").hide();
+			$("#clickthegambleyouprefer").html("Click the gamble you prefer");
+			$("#clickthegambleyouprefer").show();
+			$(".gamble img").css("cursor", "pointer");
+		} else {
+			$("#toggle").show();
+			$("#toggleinstruction").show();
+			$("#clickthegambleyouprefer").html("When you have finished toggling, click the gamble you prefer");
+			$(".gamble img").css("cursor", "default");
+			$("#clickthegambleyouprefer").hide();
+		}
+ 		$("#gamble0 .top   ").attr("src",trials[condition][currentTrial].gambles[0].top   );
+		$("#gamble0 .bottom").attr("src",trials[condition][currentTrial].gambles[0].bottom);
+		$("#gamble1 .top   ").attr("src",trials[condition][currentTrial].gambles[1].top   );
+		$("#gamble1 .bottom").attr("src",trials[condition][currentTrial].gambles[1].bottom);
+		$(".gamble img.top").removeClass("transparent");
+	}
+	
+	function NextTrial() {
+		// Save the current trial and response
+		responses[currentTrial] = "trial " + currentTrial + 
+			"= trialid " + trials[condition][currentTrial].trial +
+			// Note, gamble0 is the physical top gamble
+			" gamble.0.top " + trials[condition][currentTrial].gambles[0].top +
+			" gamble.0.bottom " + trials[condition][currentTrial].gambles[0].bottom +
+			" gamble.1.top " + trials[condition][currentTrial].gambles[1].top +
+			" gamble.1.bottom " + trials[condition][currentTrial].gambles[1].bottom +
+			" toggle.trial " + trials[condition][currentTrial].toggle+
+			" response " + trials[condition][currentTrial].resp + 
+			" RT " + trials[condition][currentTrial].rt +
+			" toggle.count " + trials[condition][currentTrial].toggleCount;
+
+		// Move to the next page
+		currentTrial++;
+		if(currentTrial<trials[condition].length) {
+			ResetTrial();
+			$("#choicepage").delay(interTrialInterval).show(0, Shown); // The zero in show() is essential for delay() to work, see http://stackoverflow.com/questions/7288669/jquery-div-show-delay5000-hide-doesnt-work
+		} else {
+			EndExperiment();
+			$("#debrief").show();
+		}
+	}
+
+	function Shown() {
+		startTime=$.now();	
+	}
+
+	function ShowDebrief() {
+		$("#verification").html(verification);
+		$("#debrief").show();
+	}
+
+	function StartWithFakeSubNo() {
+		fakeResult=Math.floor(Math.random()*maxLocalSub);
+		alert("Proceeding with locally generated subject number " + fakeResult);
+		SubNoReceived(fakeResult.toString());   
+	}
+	
+	function SubNoReceived(result) {
+		// Get everything ready once the subject number is received
+		if(isNaN(parseInt(result))) {
+			verification += "E";
+			$("#instructions").hide();
+			$("#finished").show();
+		} else {
+			subNo = parseInt(result); // 0 + coerces result to integer if necessary
+			//var rawTrials= new Array();
+			$.ajax({
+				url: "choices_3.csv", 
+				async: false, 
+				success: function(csv) { rawTrials = $.csv.toObjects(csv); },
+				dataType: "text",
+				complete: function() { 
+					for(var i=0; i<rawTrials.length; i++) {
+						var choice = {trial: 0, gambles: new Array(2), toggle: 0, resp:"", };
+						choice.trial = parseInt(rawTrials[i].trial);
+						choice.gambles[0] = {top: rawTrials[i].gamble0Top, bottom: rawTrials[i].gamble0Bottom}; // top and bottom refer to the image layers, not the location on the screen
+						choice.gambles[1] = {top: rawTrials[i].gamble1Top, bottom: rawTrials[i].gamble1Bottom};
+						choice.toggle = parseInt(rawTrials[i].toggleTrial);
+						var cond = rawTrials[i].cond;
+						if(jQuery.inArray(cond, conditions) == -1) {
+							conditions.push(cond);
+							trials[cond] = new Array();
+						}
+						trials[cond].push(choice);
+					}
+				}
+			});
+			
+			// Alternative through conditions
+			condition = conditions[subNo%conditions.length]; 
+
+			// Shuffle resp.gambles top-bottom 
+			for(var i=0; i<trials[condition].length; i++) {
+				trials[condition][i].gambles = Shuffle(trials[condition][i].gambles);
+			}
+
+			// Trial order is NOT shuffled
+
+			responses = new Array(trials[condition].length);
+				
+			ResetTrial();
+
+			// What to do on each button click
+			$("button").click(function(){
+				switch(this.id) {
+					case "start":
+						//workerId = $('input[name=workerId]').val(); 
+                        //if(workerId == "") { 
+                        //    $("#collectworkerid").css('color', 'red'); 
+                        //} else { 
+							$("#instructions").hide(); 
+							ResetTrial();
+							$("#choicepage").delay(interTrialInterval).show(0, Shown);
+                        //}
+                        break;
+					case "continue":
+						trials[condition][currentTrial].resp="right";		   
+						$("#choicepage").delay(interTrialInterval).show(0, Shown);
+						break;
+				}
+			});
+
+			$("#toggle").click(function() {
+				toggleCount++;
+				setTimeout( function() {$(".gamble img").css("cursor", "pointer");}, toggleDelay);
+				if(toggleCount>noRequiredToggles) 
+					$("#clickthegambleyouprefer").delay(0).show(0, Shown);
+				$(".gamble img.top").toggleClass("transparent");
+			});
+
+			$(".gamble").click(function() {
+				if($("#clickthegambleyouprefer").is(":visible")) {
+					stopTime = $.now();
+					trials[condition][currentTrial].resp=this.id;
+					trials[condition][currentTrial].rt=(stopTime - startTime);
+					trials[condition][currentTrial].toggleCount = toggleCount;
+					$('#choicepage').hide();
+					NextTrial();
+				}
+			});
+
+			experimentStartTime=$.now();
+			$("#instructions").show();
+		}
+	}
+
+	function EndExperiment() {
+		// Send data to server
+		experimentStopTime=$.now();
+        var experimentDuration=experimentStopTime-experimentStartTime;
+		var data="filename=" + filename + ";";
+		data += "userAgent=" + navigator.userAgent.replace(/;/g, "") + ";";
+		data += "sub_no=" + subNo + ";";
+		data += "condition=" + condition + ";";
+		data += "workerId=" + workerId + ";";
+		data += "verification=" + verification + ";";
+		data += "experimentDuration=" + experimentDuration + ";";
+		for (var key in responses) {
+			data += responses[key]+";";
+		}
+		/*responses.forEach( function(response) {
+			data += response + ";"
+		});*/
+		data = data.replace(/&pound;/g,"$");
+		data = data.replace(/&#36;/g,"$");
+		$.ajax({
+			type: "POST",
+			url: "/cgi-bin/form_2.pl", // Uses V2 of form
+			data: data,
+			dataType: "html",
+			success: ShowDebrief,
+			error: function (xhr, ajaxOptions, thrownError) {
+				verification += "F";
+				ShowDebrief();
+			}
+		});
+		// Set verification code
+		$("#verification").html(verification);
+	}
+
+	function GetSubNo() {
+		// Send subject number
+		$.ajax({
+			type: "POST",
+			url: "/cgi-bin/sub_no.pl",
+			data: "filename=" + filename + ";",
+			dataType: "html",
+			success: SubNoReceived,
+			error: function (xhr, ajaxOptions, thrownError) {
+				$("#instructions").hide();
+				$("#finished").show();
+			}
+		});
+		
+	}
+</script>
+
+
+<style>
+	body{
+		font-family:"Arial", Arial, sanserif;
+		background: white;
+	}
+		
+	button {
+		cursor:pointer;
+		border: none;
+		background: #FF00FF;
+		padding: 15px 15px;
+		border-radius: 20px;
+		font-size: 26px;
+		color: white;
+	}
+
+	button:hover {
+		background: #DD00DD;
+	}
+
+	button:active {
+		background: #AA00AA;
+	}
+
+	.center {
+		text-align: center;
+	}
+
+	.choice {
+		margin-top: 30px;
+		margin-bottom: 30px;
+		margin-left: 10px;
+		margin-right: 10px;
+		width:350px;
+		height:6em;
+		/*display:table-cell;*/
+		vertical-align:bottom;
+	}
+
+	.page {
+		background: #ffffff;
+		width: 800px;
+		margin-left: auto;
+		margin-right: auto;
+		margin-top: 50px;
+		display: none;
+	}
+
+	.instructions {
+		display: none;
+	}
+
+	.gamble {
+		position:relative;
+		height:100px;
+		width:800px;
+		margin:0 auto;
+	}
+
+	.gamble img {
+		cursor:pointer;
+		position:absolute;
+		left:0;
+		max-width:800px;
+		height:auto;
+		width:auto;;
+		-webkit-transition: opacity 1s ease-in-out;
+		-moz-transition: opacity 1s ease-in-out;
+		-o-transition: opacity 1s ease-in-out;
+		transition: opacity 1s ease-in-out;
+	}
+
+	.gamble img.transparent {
+		opacity:0;
+	}
+	
+	#toggle {
+		cursor:pointer;
+		background: #00FF00;
+	}
+
+	/*#toggleinstruction {
+		font-size: 20px;
+	}*/
+</style>
+
+<title>The Risky Choice Experiment</title>
+</head>
+
+<body>
+<div class="experiment">
+		
+
+
+<div class="page" id="instructions">
+<h1>The Risky Choice Experiment</h1>
+<p>Welcome to the risky choice experiment.</p>
+<!--<h3 id="collectworkerid">Please enter your Prolific Academic ID<input type="text" name="workerId"></h3>-->
+
+<p>In this experiment you will be asked to choose between pairs of lotteries. Each lottery offers a set of tickets. You need to choose which lottery you'd rather play.</p>
+
+<p>These pictures tell you about each lottery.</p>
+
+<div class="gamble" id="examplegamble0" class="shadow">
+	<img class="bottom" src="null.jpeg" />
+	<img class="top" src="example_gamble_0.jpeg" />
+</div>
+
+<p>&nbsp;</p>
+
+<div class="gamble" id="examplegamble1" class="shadow">
+	<img class="bottom" src="null.jpeg" />
+	<img class="top" src="example_gamble_1.jpeg" />
+</div>
+
+<p>&nbsp;</p>
+
+<p>The top picture represents a lottery with 20 tickets. In the top lottery, 10 tickets (tickets numbered #1&ndash;#10) each have a prize of &dollar;50 and 10 tickets (numbered #11&ndash;#20) each have a prize of &dollar;100. The bottom lottery also has 20 tickets. In the bottom lottery, 8 tickets (tickets numbered #1&ndash;#8) each have a prize of &dollar;0 and 12 tickets (tickets numbered #9&ndash;#20) each have a prize of &dollar;200.</p>
+
+<p>To play the lottery you draw one of the tickets from the bag at random without looking. You win whatever is on the ticket you draw. Think about which lottery would you rather play?</p>
+
+<p>As well as paying you for taking part, we are going to select one person to play out their choice for real. Whichever lottery they choose, we will draw them a ticket here at the University and pay them whatever is written on the ticket. It could be you, and it could be a lot of money, so choose carefully.</p>
+
+<p>As in all psychology experiments, you can withdraw from this study at any time for any reason. Just close your browser window!</p>
+
+<p>Click Start when you are ready to see your first choice. The whole experiment will only take a few minutes.</p>
+
+<p><button id="start">Start</button></p>
+</div>
+
+
+
+
+
+<div class="page" id="choicepage">
+
+<!--Cross fading images http://css3.bradshawenterprises.com/cfimg/-->
+<div class="gamble" id="gamble0" class="shadow">
+	<img class="bottom" src="null.jpeg" />
+	<img class="top" src="null.jpeg" />
+</div>
+
+<p>&nbsp;</p>
+
+<div class="gamble" id="gamble1" class="shadow">
+	<img class="bottom" src="null.jpeg" />
+	<img class="top" src="null.jpeg" />
+</div>
+
+<p>&nbsp;</p>
+<p id="toggleinstruction">Before you make more choices, we'd like to point something out. The &quot;Toggle&quot; button splits up some of rectangles representing tickets with the same prize into rectangles for single tickets. This doesn't change the lotteries, but it makes it much easier to compare the two lotteries. When the lotteries are split, see how one lottery matches or is better on every ticket. This lottery is better. You should toggle quite a few times, so you can see what is going on.</p>
+<p class="center"><button id="toggle">Toggle</button></p>
+
+
+<p>&nbsp;</p>
+<p class="center" id="clickthegambleyouprefer">When you have finished toggling, click the gamble you prefer</p>
+</div>
+
+
+
+<div class="page" id="debrief">
+<h1>Thank you!</h1>
+<p>The experiment is over. Thank you for taking part.</p>
+<p>We will use the choices you have made to help us understand more about how people take decisions where there is an element of risk.</p>
+<h3>Please enter the following code on MTURK to submit your HIT.</h3>
+<p id="verification">VERIFICATIONCODE</p>
+<p>If you have any concerns or questions about the experiment please email <a href="mailto:neil.stewart@warwick.ac.uk">me</a>.</p>
+<p>Details about how to make a formal complaint about this study can be found <a href="../formal_complaint.html">here</a>.</p>
+<p>Thank you again for taking part.</p>
+</div>
+
+
+<div class="page" id="finished">
+<h1>Thank you!</h1>
+<p>We are really sorry, but this experiment has finished. Hopefully you can have a go next time!</p>
+</div>
+
+
+
+<div class="page" id="preview">
+<h1>Experiment Preview</h1>
+<p>We are decision scientists at Warwick University in England. In this experiment you will make a series of choices between different lotteries. Please accept the hit to get started.</p>
+</div>
+
+
+
+</div>
+</body>
+</html>
+

@@ -1,0 +1,8 @@
+cond,trial,question,gamble0Top,gamble0Bottom,gamble1Top,gamble1Bottom,toggleTrial
+A,1,G,G_plus.jpeg,null.jpeg,G_minus.jpeg,null.jpeg,0
+A,2,G,G_plus.jpeg,GS_plus.jpeg,G_minus.jpeg,GS_minus.jpeg,1
+A,3,G,G_plus.jpeg,null.jpeg,G_minus.jpeg,null.jpeg,0
+B,1,F,F_plus.jpeg,null.jpeg,F_minus.jpeg,null.jpeg,0
+B,2,F,F_plus.jpeg,FS_plus.jpeg,F_minus.jpeg,FS_minus.jpeg,1
+B,3,G,G_plus.jpeg,null.jpeg,G_minus.jpeg,null.jpeg,0
+C,1,F,GS_plus.jpeg,null.jpeg,GS_minus.jpeg,null.jpeg,0
